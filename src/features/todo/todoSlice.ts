@@ -1,14 +1,16 @@
+import { GridSelectionModel } from '@material-ui/data-grid';
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { act } from '@testing-library/react';
 import { RootState, AppThunk } from '../../app/store';
-import { fetchCount } from './counterAPI';
+import { fetchTodo, TodoType } from './todoAPI';
 
-export interface CounterState {
-  value: number;
+export interface TodoState {
+  todos: TodoType[];
   status: 'idle' | 'loading' | 'failed';
 }
 
-const initialState: CounterState = {
-  value: 0,
+const initialState: TodoState = {
+  todos: [],
   status: 'idle',
 };
 
@@ -18,32 +20,37 @@ const initialState: CounterState = {
 // code can then be executed and other actions can be dispatched. Thunks are
 // typically used to make async requests.
 export const incrementAsync = createAsyncThunk(
-  'counter/fetchCount',
-  async (amount: number) => {
-    const response = await fetchCount(amount);
+  'todo/fetchTodo',
+  async () => {
+    const response = await fetchTodo();
     // The value we return becomes the `fulfilled` action payload
-    return response.data;
+    return response;
   }
 );
 
-export const counterSlice = createSlice({
-  name: 'counter',
+export const todoSlice = createSlice({
+  name: 'todo',
   initialState,
   // The `reducers` field lets us define reducers and generate associated actions
   reducers: {
-    increment: (state) => {
+    increment: (state, action: PayloadAction<string>) => {
       // Redux Toolkit allows us to write "mutating" logic in reducers. It
       // doesn't actually mutate the state because it uses the Immer library,
       // which detects changes to a "draft state" and produces a brand new
       // immutable state based off those changes
-      state.value += 1;
+      state.todos.unshift({
+        title: action.payload,
+        completed: false,
+        id: Date.now(),
+        userId: 11
+      })
     },
-    decrement: (state) => {
-      state.value -= 1;
-    },
-    // Use the PayloadAction type to declare the contents of `action.payload`
-    incrementByAmount: (state, action: PayloadAction<number>) => {
-      state.value += action.payload;
+    decrement: (state, action: PayloadAction<GridSelectionModel | undefined>) => {
+      state.todos.forEach((todo, i) => {
+        if (action.payload?.find(item => item === todo.id)) {
+          state.todos.splice(i, 1); 
+        }
+      });
     },
   },
   // The `extraReducers` field lets the slice handle actions defined elsewhere,
@@ -55,28 +62,14 @@ export const counterSlice = createSlice({
       })
       .addCase(incrementAsync.fulfilled, (state, action) => {
         state.status = 'idle';
-        state.value += action.payload;
+        state.todos = action.payload;
       });
   },
 });
 
-export const { increment, decrement, incrementByAmount } = counterSlice.actions;
+export const { increment, decrement } = todoSlice.actions;
 
-// The function below is called a selector and allows us to select a value from
-// the state. Selectors can also be defined inline where they're used instead of
-// in the slice file. For example: `useSelector((state: RootState) => state.counter.value)`
-export const selectCount = (state: RootState) => state.counter.value;
-
-// We can also write thunks by hand, which may contain both sync and async logic.
-// Here's an example of conditionally dispatching actions based on current state.
-export const incrementIfOdd = (amount: number): AppThunk => (
-  dispatch,
-  getState
-) => {
-  const currentValue = selectCount(getState());
-  if (currentValue % 2 === 1) {
-    dispatch(incrementByAmount(amount));
-  }
-};
-
-export default counterSlice.reducer;
+export const selectCount = (state: RootState) => state.app.todos.filter(todo => !todo.completed).length;
+export const selectTodos = (state: RootState) => state.app.todos.filter(todo => !todo.completed);
+export const selectLoading = (state: RootState) => state.app.status;
+export default todoSlice.reducer;
